@@ -17,7 +17,7 @@ router = APIRouter()
 @router.get("/", response_model=UAVListResponse)
 async def list_uavs(
     skip: int = 0,
-    limit: int = 20,
+    limit: int = 100,
     db: StandardDatabase = Depends(get_arango_db)
 ):
     """
@@ -31,15 +31,52 @@ async def list_uavs(
     Returns:
         UAVListResponse: List of UAV platforms with pagination info
     """
-    # Query all platforms
-    # TODO: Implement proper pagination with AQL
+    # Query all UAV variants with their family and manufacturer information
+    query = """
+    FOR variant IN platform_variants
+        LET family = FIRST(
+            FOR f IN 1..1 OUTBOUND variant belongs_to_family
+                RETURN f
+        )
+        LET manufacturer = FIRST(
+            FOR m IN 1..1 OUTBOUND family manufactured_by
+                RETURN m
+        )
+        SORT variant.name
+        LIMIT @skip, @limit
+        RETURN {
+            id: variant._key,
+            name: variant.name,
+            manufacturer: manufacturer ? manufacturer.name : family.manufacturer,
+            country: family ? family.country : "Unknown",
+            description: variant.description,
+            category: variant.airframe_type,
+            designation: variant.designation,
+            development_status: variant.development_status,
+            first_flight: variant.first_flight,
+            specifications: []
+        }
+    """
 
-    return UAVListResponse(
-        platforms=[],
-        total=0,
-        skip=skip,
-        limit=limit
-    )
+    # Get total count
+    count_query = "RETURN LENGTH(platform_variants)"
+
+    try:
+        # Execute queries
+        cursor = db.aql.execute(query, bind_vars={"skip": skip, "limit": limit})
+        count_cursor = db.aql.execute(count_query)
+
+        platforms = list(cursor)
+        total = next(count_cursor)
+
+        return UAVListResponse(
+            platforms=platforms,
+            total=total,
+            skip=skip,
+            limit=limit
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
 
 
 @router.get("/{uav_id}", response_model=UAVPlatformResponse)

@@ -9,8 +9,6 @@ services:
       - "8529:8529"
     volumes:
       - ./data/arangodb:/var/lib/arangodb3
-    networks:
-      - x-uav-network
     restart: unless-stopped
 
   # PostgreSQL for relational data
@@ -22,11 +20,9 @@ services:
       POSTGRES_USER: xuav
       POSTGRES_PASSWORD: development
     ports:
-      - "5432:5432"
+      - "5434:5432"  # Using 5434 to avoid conflicts (5432 and 5433 are in use)
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
-    networks:
-      - x-uav-network
     restart: unless-stopped
 
   # Redis for caching and real-time features
@@ -37,8 +33,6 @@ services:
       - "6379:6379"
     volumes:
       - ./data/redis:/data
-    networks:
-      - x-uav-network
     restart: unless-stopped
     command: redis-server --appendonly yes
 
@@ -51,7 +45,7 @@ services:
     environment:
       - ENVIRONMENT=development
       - PORT=8000
-      - DATABASE_URL=postgresql://xuav:development@postgres:5432/xuav
+      - DATABASE_URL=postgresql://xuav:development@postgres:5432/xuav  # Internal port is still 5432
       - GRAPH_DB_URL=http://arangodb:8529
       - REDIS_URL=redis://redis:6379
       - OLLAMA_URL=http://host.docker.internal:11434
@@ -60,8 +54,6 @@ services:
     volumes:
       - ./backend:/app
       - /app/.venv  # Don't mount venv from host
-    networks:
-      - x-uav-network
     depends_on:
       - arangodb
       - postgres
@@ -83,13 +75,7 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules  # Don't mount node_modules from host
-    networks:
-      - x-uav-network
     depends_on:
       - backend
     restart: unless-stopped
     command: npm run dev -- --host 0.0.0.0 --port 7676
-
-networks:
-  x-uav-network:
-    driver: bridge

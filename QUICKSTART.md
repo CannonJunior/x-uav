@@ -1,224 +1,145 @@
 # X-UAV Quick Start Guide
 
+Get the X-UAV application up and running in under 5 minutes!
+
 ## Prerequisites
 
-Before starting, ensure you have:
 - Docker and Docker Compose installed
-- Git (for version control)
-- (Optional) Node.js 20+ for local frontend development
-- (Optional) Python 3.11+ with `uv` for local backend development
+- Port 8529 (ArangoDB) available
+- Port 6379 (Redis) available
+- Port 5434 (PostgreSQL) available (uses 5434 to avoid conflicts with 5432/5433)
+- Port 8000 (Backend API) available
+- Port 7676 (Frontend) available
 
-## Starting the Application
-
-### Option 1: Docker Compose (Recommended)
-
-The easiest way to run the entire application:
+## Start the Application
 
 ```bash
-# From the project root directory
-docker-compose up -d
+# Make scripts executable (first time only)
+chmod +x start.sh stop.sh status.sh
+
+# Start all services
+./start.sh
 ```
 
-This starts:
-- ArangoDB on port 8529
-- PostgreSQL on port 5432
-- Redis on port 6379
-- Backend API on port 8000
-- Frontend on port 7676
+The script will:
+1. ✓ Check if Docker is running
+2. ✓ Stop any existing X-UAV services
+3. ✓ Start ArangoDB, PostgreSQL, and Redis
+4. ✓ Wait for databases to be ready
+5. ✓ Initialize the database schema
+6. ✓ Import CCA platform data
+7. ✓ Start the Backend API
+8. ✓ Start the Frontend application
+9. ✓ Show service status and URLs
 
-### Access the Application
+## Access the Application
 
-Once all services are running:
+Once started, access services at:
 
-1. **Frontend Web Interface**: http://localhost:7676
-2. **Backend API**: http://localhost:8000
-3. **API Documentation**: http://localhost:8000/docs
-4. **ArangoDB Web UI**: http://localhost:8529
-   - Username: `root`
-   - Password: `development`
+- **Frontend**: http://localhost:7676
+- **API Documentation**: http://localhost:8000/docs
+- **ArangoDB Web UI**: http://localhost:8529
+  - Username: `root`
+  - Password: `development`
 
-### Check Service Status
+## Common Commands
 
 ```bash
-# View logs from all services
-docker-compose logs -f
+# Check service status
+./status.sh
 
-# View logs from specific service
-docker-compose logs -f backend
-docker-compose logs -f frontend
+# View logs for all services
+./status.sh --logs
 
-# Check running containers
-docker-compose ps
+# View logs for specific service
+./status.sh --logs backend
+
+# Check health status
+./status.sh --health
+
+# Stop services
+./stop.sh
+
+# Stop and remove containers
+./stop.sh --remove
+
+# Restart services
+./start.sh
 ```
-
-### Stop the Application
-
-```bash
-# Stop all services
-docker-compose down
-
-# Stop and remove all data (WARNING: deletes database contents)
-docker-compose down -v
-```
-
-## Option 2: Local Development
-
-### Backend Development
-
-```bash
-cd backend
-
-# Install dependencies
-uv pip install -e ".[dev]"
-
-# Run development server (requires databases to be running)
-uv run uvicorn app.main:app --reload --port 8000
-```
-
-**Note**: You still need to start ArangoDB, PostgreSQL, and Redis:
-
-```bash
-docker-compose up -d arangodb postgres redis
-```
-
-### Frontend Development
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Run development server
-npm run dev
-```
-
-The frontend will be available at http://localhost:7676
-
-## First Time Setup
-
-After starting the application for the first time:
-
-1. **Check Health**: Visit http://localhost:7676 and verify the API status shows "healthy"
-
-2. **Explore ArangoDB**:
-   - Open http://localhost:8529
-   - Login with root/development
-   - The `xuav` database will be created automatically
-
-3. **View API Docs**:
-   - Open http://localhost:8000/docs
-   - Explore available endpoints
 
 ## Troubleshooting
 
-### Port Already in Use
+### Port Conflicts
 
-If you see "port already in use" errors:
+If you see "port already allocated" errors:
 
 ```bash
-# Check what's using the port (example for port 7676)
-sudo lsof -i :7676
+# Check what's using the port
+lsof -i :8529  # ArangoDB
+lsof -i :5434  # PostgreSQL (Docker)
+lsof -i :6379  # Redis
 
-# Kill the process
-sudo kill -9 <PID>
+# Note: Docker PostgreSQL uses port 5434 to avoid conflicts
+# with local PostgreSQL on ports 5432/5433
 ```
 
-Or change the port in `.env`:
+### Services Won't Start
 
-```env
-PORT=7677  # Use a different port
-```
-
-### Database Connection Errors
-
-1. Ensure Docker services are running:
 ```bash
-docker-compose ps
+# Check Docker is running
+docker info
+
+# View detailed logs
+./status.sh --logs
+
+# Clean restart
+./stop.sh --remove
+./start.sh --rebuild
 ```
 
-2. Check service logs:
+### Database Issues
+
 ```bash
-docker-compose logs arangodb
-docker-compose logs postgres
+# Reinitialize database
+cd backend
+uv run python scripts/init_db.py
+
+# Or clean start
+./start.sh --clean
 ```
-
-3. Restart services:
-```bash
-docker-compose restart
-```
-
-### Frontend Can't Connect to Backend
-
-1. Check backend is running: http://localhost:8000/health
-
-2. Verify CORS settings in `backend/app/core/config.py`
-
-3. Check browser console for errors
 
 ## Development Workflow
 
-### Making Changes
-
-1. **Backend Changes**:
-   - Edit files in `backend/app/`
-   - Uvicorn will auto-reload on file changes
-
-2. **Frontend Changes**:
-   - Edit files in `frontend/src/`
-   - Vite will hot-reload in the browser
-
-3. **Database Schema Changes**:
-   - See `IMPLEMENTATION-STATUS.md` for schema setup
-
-### Running Tests
-
 ```bash
-# Backend tests
-cd backend
-uv run pytest
+# 1. Start services
+./start.sh
 
-# Frontend tests (when implemented)
-cd frontend
-npm run test
+# 2. Make code changes...
+
+# 3. Backend auto-reloads
+# 4. Frontend auto-rebuilds
+
+# 5. Check logs if needed
+./status.sh --logs backend
+
+# 6. Stop when done
+./stop.sh
 ```
 
 ## Next Steps
 
-After getting the application running:
+- Explore the API at http://localhost:8000/docs
+- Browse the graph database at http://localhost:8529
+- Read the full documentation in SCRIPTS.md
+- Check the ontology documentation in backend/docs/ONTOLOGY.md
 
-1. Review the [PROJECT-PLAN.md](PROJECT-PLAN.md) for the full roadmap
-2. Check [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) for current progress
-3. See [README.md](README.md) for detailed documentation
-
-## Getting Help
-
-- Check logs: `docker-compose logs -f`
-- Review configuration: `.env` file
-- API documentation: http://localhost:8000/docs
-- Project documentation: See `docs/` directory
-
----
-
-**Quick Command Reference**
+## Need Help?
 
 ```bash
-# Start everything
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop everything
-docker-compose down
-
-# Restart a service
-docker-compose restart backend
-
-# Rebuild a service
-docker-compose up -d --build backend
-
-# Access a container shell
-docker-compose exec backend bash
-docker-compose exec frontend sh
+# Show help for any script
+./start.sh --help
+./stop.sh --help
+./status.sh --help
 ```
+
+For detailed information, see [SCRIPTS.md](SCRIPTS.md).

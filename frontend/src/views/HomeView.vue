@@ -58,7 +58,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { checkApiHealth } from '@/services/api'
+import { checkApiHealth, getUAVs } from '@/services/api'
 
 const apiStatus = ref('checking...')
 const uavCount = ref(0)
@@ -67,6 +67,10 @@ onMounted(async () => {
   try {
     const health = await checkApiHealth()
     apiStatus.value = health.status
+
+    // Fetch UAV count
+    const uavData = await getUAVs()
+    uavCount.value = uavData.total
   } catch (error) {
     apiStatus.value = 'unavailable'
     console.error('API health check failed:', error)
