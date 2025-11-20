@@ -1,48 +1,242 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
-Database initialization script.
+Database initialization script for X-UAV application.
 
-Initializes the ArangoDB schema and imports initial CCA platform data.
+Creates DuckDB database with schema and loads initial UAV data.
 """
 
+import json
 import sys
 from pathlib import Path
+from typing import Dict, List, Any
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from app.db.arangodb import arango_connection
-from app.db.schema import init_schema
-from app.services.import_service import import_cca_data
+import duckdb
 
 
-def main():
-    """Main initialization function."""
-    print("\n" + "="*60)
-    print("X-UAV Database Initialization")
-    print("="*60 + "\n")
+def get_project_root() -> Path:
+    """
+    Get the project root directory.
 
-    # Connect to database
-    print("Connecting to ArangoDB...")
-    db = arango_connection.connect()
-    print(f"✓ Connected to database: {db.name}\n")
+    Returns:
+        Path: Project root directory
+    """
+    # Script is in backend/scripts, so go up 2 levels
+    return Path(__file__).parent.parent.parent
 
-    # Initialize schema
-    graph = init_schema(db)
-    print(f"✓ Graph '{graph.name}' initialized\n")
 
-    # Import CCA data
-    stats = import_cca_data(db)
+def load_schema(schema_path: Path) -> str:
+    """
+    Load SQL schema from file.
 
-    print("\n" + "="*60)
-    print("Database initialization complete!")
-    print("="*60 + "\n")
+    Args:
+        schema_path (Path): Path to schema.sql file
 
-    print("Next steps:")
-    print("  1. Start the backend: uv run uvicorn app.main:app --reload")
-    print("  2. Visit API docs: http://localhost:8000/docs")
-    print("  3. Explore ArangoDB: http://localhost:8529\n")
+    Returns:
+        str: SQL schema content
+
+    Raises:
+        FileNotFoundError: If schema file doesn't exist
+    """
+    if not schema_path.exists():
+        raise FileNotFoundError(f"Schema file not found: {schema_path}")
+
+    with open(schema_path, 'r', encoding='utf-8') as f:
+        return f.read()
+
+
+def load_initial_data(data_path: Path) -> List[Dict[str, Any]]:
+    """
+    Load initial UAV data from JSON file.
+
+    Args:
+        data_path (Path): Path to initial_uavs.json file
+
+    Returns:
+        List[Dict[str, Any]]: List of UAV records
+
+    Raises:
+        FileNotFoundError: If data file doesn't exist
+        json.JSONDecodeError: If JSON is invalid
+    """
+    if not data_path.exists():
+        raise FileNotFoundError(f"Data file not found: {data_path}")
+
+    with open(data_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+
+def convert_json_fields(uav: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert JSON array/object fields to JSON strings for DuckDB.
+
+    Args:
+        uav (Dict[str, Any]): UAV record
+
+    Returns:
+        Dict[str, Any]: UAV record with JSON fields converted
+    """
+    json_fields = [
+        'mission_types', 'armament', 'sensor_suite', 'operators',
+        'export_countries', 'notable_features', 'imagery_urls',
+        'model_urls', 'variants'
+    ]
+
+    converted = uav.copy()
+    for field in json_fields:
+        if field in converted and converted[field] is not None:
+            if isinstance(converted[field], (list, dict)):
+                converted[field] = json.dumps(converted[field])
+
+    return converted
+
+
+def insert_uav(conn: duckdb.DuckDBPyConnection, uav: Dict[str, Any]) -> None:
+    """
+    Insert a single UAV record into the database.
+
+    Args:
+        conn (duckdb.DuckDBPyConnection): Database connection
+        uav (Dict[str, Any]): UAV record to insert
+    """
+    # Get valid column names from the table schema
+    schema_result = conn.execute("PRAGMA table_info('uavs')").fetchall()
+    valid_columns = {row[1] for row in schema_result}  # row[1] is the column name
+
+    # Convert JSON fields
+    uav_data = convert_json_fields(uav)
+
+    # Filter to only include valid columns
+    filtered_data = {k: v for k, v in uav_data.items() if k in valid_columns}
+
+    # Build column names and placeholders
+    columns = list(filtered_data.keys())
+    placeholders = ['?' for _ in columns]
+    values = [filtered_data[col] for col in columns]
+
+    # Construct INSERT statement
+    insert_sql = f"""
+        INSERT INTO uavs ({', '.join(columns)})
+        VALUES ({', '.join(placeholders)})
+    """
+
+    try:
+        conn.execute(insert_sql, values)
+    except Exception as e:
+        print(f"Error inserting UAV {uav.get('designation', 'UNKNOWN')}: {e}")
+        raise
+
+
+def init_database(db_path: Path, schema_path: Path, data_path: Path) -> None:
+    """
+    Initialize the UAV database.
+
+    Args:
+        db_path (Path): Path to database file
+        schema_path (Path): Path to schema.sql file
+        data_path (Path): Path to initial_uavs.json file
+
+    Raises:
+        Exception: If database initialization fails
+    """
+    print("🚀 Initializing X-UAV database...")
+
+    # Ensure database directory exists
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Connect to DuckDB
+    print(f"📂 Connecting to database: {db_path}")
+    conn = duckdb.connect(str(db_path))
+
+    try:
+        # Load and execute schema
+        print("📋 Loading schema...")
+        schema_sql = load_schema(schema_path)
+        conn.execute(schema_sql)
+        print("✅ Schema created successfully")
+
+        # Load initial data
+        print("📦 Loading initial UAV data...")
+        uavs_data = load_initial_data(data_path)
+        print(f"   Found {len(uavs_data)} UAVs to load")
+
+        # Insert each UAV
+        print("💾 Inserting UAV records...")
+        for i, uav in enumerate(uavs_data, 1):
+            designation = uav.get('designation', 'UNKNOWN')
+            print(f"   [{i}/{len(uavs_data)}] Inserting {designation}...")
+            insert_uav(conn, uav)
+
+        # Verify insertion
+        result = conn.execute("SELECT COUNT(*) FROM uavs").fetchone()
+        count = result[0] if result else 0
+        print(f"✅ Successfully loaded {count} UAVs into database")
+
+        # Show summary by country
+        print("\n📊 UAV Summary by Country:")
+        summary = conn.execute("""
+            SELECT country_of_origin, COUNT(*) as count
+            FROM uavs
+            GROUP BY country_of_origin
+            ORDER BY count DESC
+        """).fetchall()
+
+        for country, count in summary:
+            print(f"   {country}: {count}")
+
+        # Show summary by type
+        print("\n📊 UAV Summary by Type:")
+        type_summary = conn.execute("""
+            SELECT type, COUNT(*) as count
+            FROM uavs
+            WHERE type IS NOT NULL
+            GROUP BY type
+            ORDER BY count DESC
+        """).fetchall()
+
+        for uav_type, count in type_summary:
+            print(f"   {uav_type}: {count}")
+
+    except Exception as e:
+        print(f"❌ Error during database initialization: {e}")
+        raise
+    finally:
+        conn.close()
+
+    print("\n✅ Database initialization complete!")
+    print(f"📍 Database location: {db_path}")
+
+
+def main() -> int:
+    """
+    Main entry point for database initialization.
+
+    Returns:
+        int: Exit code (0 for success, 1 for failure)
+    """
+    try:
+        # Get project paths
+        project_root = get_project_root()
+        db_path = project_root / "backend" / "data_db" / "uavs.duckdb"
+        schema_path = project_root / "backend" / "db" / "schema.sql"
+        data_path = project_root / "backend" / "data" / "initial_uavs.json"
+
+        # Initialize database
+        init_database(db_path, schema_path, data_path)
+
+        return 0
+
+    except FileNotFoundError as e:
+        print(f"❌ File not found: {e}")
+        return 1
+    except json.JSONDecodeError as e:
+        print(f"❌ Invalid JSON in data file: {e}")
+        return 1
+    except Exception as e:
+        print(f"❌ Unexpected error: {e}")
+        import traceback
+        traceback.print_exc()
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

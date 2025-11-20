@@ -1,192 +1,291 @@
-# X-UAV: UAV Comparison Platform
+# X-UAV: Unmanned Aerial Vehicle Comparison Platform
 
-Advanced web application for comparing unmanned aerial vehicles with graph-based visualization, mission-centric analysis, and variant-level comparisons.
+A comprehensive web application for comparing government and military unmanned aerial vehicles (UAVs) from around the world.
 
-## Key Features
+## Overview
 
-- **Mission-Centric Comparison**: Analyze UAVs by mission type (ISR, Strike, EW, etc.)
-- **Variant-Level Analysis**: Compare platform families and mission-specific configurations
-- **Graph Visualization**: Interactive network visualization of UAV relationships
-- **Agent-Native Architecture**: Ollama-powered LLM interface with MCP tools
-- **Zero-Cost Deployment**: Runs entirely on localhost with open-source stack
+X-UAV provides detailed specifications, performance metrics, and visual comparisons of military and government UAVs. The platform enables users to compare different UAV systems across multiple dimensions including performance, capabilities, cost, and operational characteristics.
 
-## Quick Start
+### Current Status
 
-### Prerequisites
+**Phase**: Planning & Data Collection Complete ✅
+**Next Phase**: Core Application Implementation
 
-- Docker and Docker Compose
-- Node.js 20+ (for local frontend development)
-- Python 3.11+ with `uv` (for local backend development)
+## Features
 
-### Running with Docker Compose
+### Current (Phase 1 - In Development)
+- Comprehensive UAV database with 16 initial entries
+- Detailed specifications covering 80+ data fields
+- RESTful API for data access
+- Responsive table display with sorting and filtering
+- Zero-cost local deployment with DuckDB
 
-```bash
-# Start all services
-docker-compose up -d
+### Planned (Future Phases)
+- Visual imagery for each UAV
+- Accurately scaled overhead silhouettes for size comparison
+- Interactive 3D model viewer with rotation capability
+- Performance comparison charts and analytics
+- Export functionality (PDF, CSV)
+- Advanced search and filtering
 
-# View logs
-docker-compose logs -f
+## Technology Stack
 
-# Stop all services
-docker-compose down
-```
+### Backend
+- **Framework**: FastAPI (Python)
+- **Database**: DuckDB (embedded, zero-cost, high-performance analytical database)
+- **Package Manager**: uv (fast Python package management)
+- **Data Validation**: Pydantic
+- **Testing**: pytest
 
-### Access Points
+### Frontend
+- **Framework**: Vue.js 3
+- **Build Tool**: Vite
+- **Styling**: CSS3
+- **3D Rendering** (future): Three.js
 
-- **Frontend**: http://localhost:7676
-- **Backend API**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs
-- **ArangoDB UI**: http://localhost:8529 (username: root, password: development)
+### Development
+- **Port**: 7676
+- **Environment**: Local development (localhost)
+- **Deployment**: Zero-cost, local-first architecture
 
-### Local Development
+## UAV Coverage
 
-#### Backend
+### 16 UAVs from 6 Countries
 
-```bash
-cd backend
+#### United States (5)
+- MQ-9 Reaper - MALE UCAV
+- RQ-4 Global Hawk - HALE ISR
+- MQ-1 Predator - MALE ISR/Strike (Retired)
+- RQ-170 Sentinel - Stealth ISR
+- X-47B - Stealth UCAV Demonstrator
 
-# Install dependencies
-uv pip install -e ".[dev]"
+#### China (4)
+- Wing Loong II - MALE UCAV
+- CH-4 Rainbow - MALE UCAV
+- GJ-11 Sharp Sword - Stealth UCAV
+- WZ-8 - Supersonic Reconnaissance
 
-# Run development server
-uv run uvicorn app.main:app --reload --port 8000
-```
+#### Russia (3)
+- Orion/Sirius - MALE UCAV
+- Korsar - Tactical ISR
+- Forpost-R - MALE ISR
 
-#### Frontend
+#### Turkey (1)
+- Bayraktar TB2 - MALE UCAV
 
-```bash
-cd frontend
+#### Israel (2)
+- Hermes 450 - MALE ISR
+- Heron TP - MALE ISR
 
-# Install dependencies
-npm install
-
-# Run development server
-npm run dev
-```
+#### United Kingdom (1)
+- Watchkeeper WK450 - Tactical ISR
 
 ## Project Structure
 
 ```
 x-uav/
-├── backend/           # FastAPI backend
-│   ├── app/
-│   │   ├── api/      # API endpoints
-│   │   ├── core/     # Configuration
-│   │   ├── db/       # Database connections
-│   │   ├── models/   # Data models
-│   │   ├── schemas/  # Pydantic schemas
-│   │   └── services/ # Business logic
-│   └── pyproject.toml
-├── frontend/          # Vue.js frontend
-│   ├── src/
-│   │   ├── components/
-│   │   ├── views/
-│   │   ├── router/
-│   │   ├── services/
-│   │   └── assets/
-│   └── package.json
-├── docker/           # Docker configurations
-├── data/             # Persistent data volumes
-├── tests/            # Test suites
-└── docs/             # Documentation
+├── backend/
+│   ├── app/              # FastAPI application (to be created)
+│   ├── scripts/          # Utility scripts
+│   │   └── init_db.py   # Database initialization (to be created)
+│   ├── tests/            # Pytest unit tests (to be created)
+│   ├── db/
+│   │   └── schema.sql   # ✅ DuckDB schema
+│   └── data/
+│       └── initial_uavs.json  # ✅ Initial UAV data (16 UAVs)
+├── frontend/
+│   ├── src/              # Vue.js source code (to be created)
+│   └── public/           # Static assets (to be created)
+├── data/                 # Database storage directory
+├── CLAUDE.md            # ✅ Project guidelines
+├── PROMPTS.md           # ✅ Prompt tracking
+├── PROJECT-SUMMARY.md   # ✅ Detailed project summary
+├── UAV-DATA-MODEL.md    # ✅ Data model specification
+├── VISUAL-REQUIREMENTS.md # ✅ Visual asset requirements
+├── DATABASE-SCHEMA.md   # ✅ Database design documentation
+└── TASK.md              # ✅ Task tracking
 
+✅ = Completed
 ```
 
-## Technology Stack
+## Quick Start
 
-### Frontend
-- Vue.js 3 with Composition API
-- Vite build tool
-- Cytoscape.js (graph visualization)
-- ECharts (charts and data visualization)
-- Axios (HTTP client)
+### Prerequisites
+- Python 3.10+
+- Node.js 18+
+- uv (Python package manager)
 
-### Backend
-- FastAPI (Python web framework)
-- Pydantic (data validation)
-- SQLAlchemy (ORM for PostgreSQL)
-- python-arango (ArangoDB client)
+### Installation (Coming Soon)
 
-### Databases
-- **ArangoDB**: Graph database for UAV relationships
-- **PostgreSQL**: Relational data (users, alerts)
-- **Redis**: Caching and real-time features
+```bash
+# Clone the repository
+git clone <repository-url>
+cd x-uav
 
-### AI/ML
-- **Ollama**: Local LLM deployment
-- **MCP**: Model Context Protocol for agent tools
+# Backend setup
+cd backend
+uv sync
+uv run scripts/init_db.py
 
-## Development Roadmap
+# Start backend (port 7676)
+uv run uvicorn app.main:app --host 0.0.0.0 --port 7676 --reload
 
-### Phase 1: Foundation ✅ (Current)
-- [x] Project setup and Docker configuration
-- [x] ArangoDB integration
-- [x] FastAPI backend skeleton
-- [x] Vue.js frontend skeleton
-- [x] Basic health check endpoints
+# Frontend setup (in new terminal)
+cd frontend
+npm install
+npm run dev
+```
 
-### Phase 2: Data Model and Ontology
-- [ ] Complete JSON-LD schema
-- [ ] Graph database schema implementation
-- [ ] Data import pipeline
-- [ ] Sample CCA platform data
+### Access
+- **Frontend**: http://localhost:7676
+- **API Docs**: http://localhost:7676/docs
+- **API**: http://localhost:7676/api
 
-### Phase 3: Core API and Search
-- [ ] UAV CRUD endpoints
-- [ ] Advanced search functionality
-- [ ] Graph traversal endpoints
-- [ ] API testing suite
+## API Endpoints (Planned)
 
-### Phase 4: Frontend Comparison UI
-- [ ] UAV listing and search
-- [ ] Side-by-side comparison table
-- [ ] Filtering and sorting
-- [ ] Responsive design
+```
+GET  /api/uavs                    # List all UAVs
+GET  /api/uavs/{designation}      # Get specific UAV
+POST /api/uavs/compare            # Compare multiple UAVs
+POST /api/uavs/search             # Search with filters
+GET  /api/health                  # Health check
+```
 
-### Phase 5: Graph Visualization
-- [ ] Cytoscape.js integration
-- [ ] Interactive graph exploration
-- [ ] Layout algorithms
-- [ ] Node/edge filtering
+## Data Model
 
-### Phase 6: Ollama and MCP Integration
-- [ ] Ollama service setup
-- [ ] MCP server implementation
-- [ ] Chat interface
-- [ ] Natural language queries
+Each UAV entry includes:
 
-### Phase 7-10: Advanced Features
-- See [PROJECT-PLAN.md](PROJECT-PLAN.md) for full roadmap
+### Identification
+- Designation, Name, Manufacturer
+- Country of Origin, NATO Class, Type
+- Operational Status
+
+### Physical Characteristics
+- Dimensions (wingspan, length, height)
+- Weights (empty, max takeoff)
+- Payload capacity, Fuel capacity
+- Airframe type
+
+### Propulsion
+- Engine type, manufacturer, model
+- Thrust/horsepower, Number of engines
+- Propeller configuration
+
+### Performance
+- Speed (cruise, max)
+- Service ceiling
+- Range, Endurance
+- Combat radius
+
+### Mission Capabilities
+- Primary function, Mission types
+- Armament, Weapons load
+- Hardpoints, Internal weapons bays
+
+### Sensors & Avionics
+- Sensor suite, Radar type
+- Communications, Datalink
+- Stealth features, Autonomy level
+
+### Operational Details
+- Operators, Export countries
+- Crew size, Ground control station
+- Launch/recovery methods
+
+### Economic
+- Unit cost, Program cost
+- Fiscal year
+
+### Visual Assets (Future)
+- Imagery URLs, Silhouette URL
+- 3D Model URLs
+
+## Development Guidelines
+
+Following `CLAUDE.md` project guidelines:
+
+- ✅ **Port 7676**: Always use port 7676 for the web application
+- ✅ **Zero-cost**: Use DuckDB (embedded), local hosting, no cloud services
+- ✅ **No Hardcoded Values**: Configuration-driven design
+- ✅ **Modular Code**: Keep files under 500 lines
+- ✅ **Well-Tested**: Pytest unit tests for all features
+- ✅ **Type Hints**: Use Python type hints throughout
+- ✅ **Docstrings**: Google-style docstrings for all functions
+- ✅ **uv Package Manager**: Use `uv` instead of `pip`
+
+## Testing
+
+```bash
+# Run backend tests
+cd backend
+uv run pytest
+
+# Run frontend tests (when implemented)
+cd frontend
+npm run test
+```
+
+## Documentation
+
+- **`PROJECT-SUMMARY.md`**: Comprehensive project overview and status
+- **`UAV-DATA-MODEL.md`**: Complete data model specification
+- **`DATABASE-SCHEMA.md`**: Database design and DuckDB schema
+- **`VISUAL-REQUIREMENTS.md`**: Visual asset specifications and requirements
+- **`TASK.md`**: Task tracking and project roadmap
+- **`PROMPTS.md`**: Prompt history and tracking
+
+## Roadmap
+
+### Phase 1: Core Application (Current) 🔄
+- Database initialization
+- FastAPI backend with DuckDB
+- Vue.js frontend with table display
+- Sorting, filtering, search
+- Unit tests
+
+### Phase 2: Visual Enhancements ⏳
+- UAV imagery integration
+- Overhead silhouette comparison tool
+- Image galleries
+
+### Phase 3: 3D Model Viewer ⏳
+- Three.js integration
+- Interactive 3D models
+- Rotation, zoom, preset views
+
+### Phase 4: Advanced Features ⏳
+- Performance comparison charts
+- Export functionality (PDF, CSV)
+- User preferences
+- Saved comparisons
+- Expanded UAV database (50+ UAVs)
 
 ## Contributing
 
-This is an open-source project. Contributions are welcome!
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+This is currently a solo development project. Contributions, suggestions, and UAV data additions are welcome.
 
 ## Data Sources
 
-All UAV data is sourced from publicly available information:
-- The War Zone (www.twz.com)
-- Wikipedia
-- Government fact sheets and procurement documents
-- Defense industry publications
+- Wikipedia (Unmanned Aerial Vehicle articles)
+- JAPCC (Joint Air Power Competence Centre)
+- Official manufacturer specifications
+- Government fact sheets (USAF, NATO, etc.)
+- Defense news publications
 
 ## License
 
-Open source - see LICENSE file for details.
+_(To be determined)_
 
-## Acknowledgments
+## Disclaimer
 
-- Inspired by the need for comprehensive UAV comparison tools
-- Built with modern web technologies and zero-cost principles
-- Focuses on transparency and verifiable data sources
+This application compiles publicly available information about military UAVs for educational and comparison purposes. All data is sourced from public domain materials and open-source intelligence. No classified or export-controlled information is included.
+
+## Contact
+
+_(To be added)_
 
 ---
 
-**Project Status**: Phase 1 Complete - Foundation Established
-
-For detailed implementation plan, see [PROJECT-PLAN.md](PROJECT-PLAN.md)
+**Last Updated**: 2025-11-18
+**Version**: 0.1.0-alpha
+**Status**: Planning Complete, Development In Progress

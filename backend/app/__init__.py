@@ -1,7 +1,3 @@
-"""
-X-UAV Backend Application
-
-UAV comparison platform with graph database, JSON-LD ontology, and MCP integration.
-"""
+"""X-UAV Backend Application."""
 
 __version__ = "0.1.0"

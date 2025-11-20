@@ -83,3 +83,4 @@
 ### 📝 Memoization Instructions
 - **Memoize any input given in MEMOIZE.md file.**
 - **This project focuses on agent-native RAG features to help users with document analysis and knowledge synthesis.**
+- **ALL prompts to Claude Code MUST be appended to PROMPTS.md** with date, objectives, and status for tracking and reference.
