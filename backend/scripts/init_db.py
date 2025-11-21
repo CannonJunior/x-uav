@@ -65,29 +65,80 @@ def load_initial_data(data_path: Path) -> List[Dict[str, Any]]:
         return json.load(f)
 
 
-def convert_json_fields(uav: Dict[str, Any]) -> Dict[str, Any]:
+def convert_json_fields(record: Dict[str, Any], json_fields: List[str]) -> Dict[str, Any]:
     """
     Convert JSON array/object fields to JSON strings for DuckDB.
 
     Args:
-        uav (Dict[str, Any]): UAV record
+        record (Dict[str, Any]): Record to convert
+        json_fields (List[str]): List of field names that contain JSON
 
     Returns:
-        Dict[str, Any]: UAV record with JSON fields converted
+        Dict[str, Any]: Record with JSON fields converted
     """
-    json_fields = [
-        'mission_types', 'armament', 'sensor_suite', 'operators',
-        'export_countries', 'notable_features', 'imagery_urls',
-        'model_urls', 'variants'
-    ]
-
-    converted = uav.copy()
+    converted = record.copy()
     for field in json_fields:
         if field in converted and converted[field] is not None:
             if isinstance(converted[field], (list, dict)):
                 converted[field] = json.dumps(converted[field])
 
     return converted
+
+
+UAV_JSON_FIELDS = [
+    'mission_types', 'armament', 'sensor_suite', 'operators',
+    'export_countries', 'notable_features', 'imagery_urls',
+    'model_urls', 'variants'
+]
+
+ARMAMENT_JSON_FIELDS = [
+    'launch_platform_types', 'variants', 'notable_features'
+]
+
+
+def insert_record(
+    conn: duckdb.DuckDBPyConnection,
+    table_name: str,
+    record: Dict[str, Any],
+    json_fields: List[str],
+    id_field: str = 'designation'
+) -> None:
+    """
+    Insert a single record into a database table.
+
+    Args:
+        conn (duckdb.DuckDBPyConnection): Database connection
+        table_name (str): Name of the table
+        record (Dict[str, Any]): Record to insert
+        json_fields (List[str]): Fields containing JSON data
+        id_field (str): Field name to use for error messages
+    """
+    # Get valid column names from the table schema
+    schema_result = conn.execute(f"PRAGMA table_info('{table_name}')").fetchall()
+    valid_columns = {row[1] for row in schema_result}
+
+    # Convert JSON fields
+    record_data = convert_json_fields(record, json_fields)
+
+    # Filter to only include valid columns
+    filtered_data = {k: v for k, v in record_data.items() if k in valid_columns}
+
+    # Build column names and placeholders
+    columns = list(filtered_data.keys())
+    placeholders = ['?' for _ in columns]
+    values = [filtered_data[col] for col in columns]
+
+    # Construct INSERT statement
+    insert_sql = f"""
+        INSERT INTO {table_name} ({', '.join(columns)})
+        VALUES ({', '.join(placeholders)})
+    """
+
+    try:
+        conn.execute(insert_sql, values)
+    except Exception as e:
+        print(f"Error inserting into {table_name} ({record.get(id_field, 'UNKNOWN')}): {e}")
+        raise
 
 
 def insert_uav(conn: duckdb.DuckDBPyConnection, uav: Dict[str, Any]) -> None:
@@ -98,42 +149,47 @@ def insert_uav(conn: duckdb.DuckDBPyConnection, uav: Dict[str, Any]) -> None:
         conn (duckdb.DuckDBPyConnection): Database connection
         uav (Dict[str, Any]): UAV record to insert
     """
-    # Get valid column names from the table schema
-    schema_result = conn.execute("PRAGMA table_info('uavs')").fetchall()
-    valid_columns = {row[1] for row in schema_result}  # row[1] is the column name
+    insert_record(conn, 'uavs', uav, UAV_JSON_FIELDS, 'designation')
 
-    # Convert JSON fields
-    uav_data = convert_json_fields(uav)
 
-    # Filter to only include valid columns
-    filtered_data = {k: v for k, v in uav_data.items() if k in valid_columns}
-
-    # Build column names and placeholders
-    columns = list(filtered_data.keys())
-    placeholders = ['?' for _ in columns]
-    values = [filtered_data[col] for col in columns]
-
-    # Construct INSERT statement
-    insert_sql = f"""
-        INSERT INTO uavs ({', '.join(columns)})
-        VALUES ({', '.join(placeholders)})
+def insert_armament(conn: duckdb.DuckDBPyConnection, armament: Dict[str, Any]) -> None:
     """
+    Insert a single armament record into the database.
 
-    try:
-        conn.execute(insert_sql, values)
-    except Exception as e:
-        print(f"Error inserting UAV {uav.get('designation', 'UNKNOWN')}: {e}")
-        raise
-
-
-def init_database(db_path: Path, schema_path: Path, data_path: Path) -> None:
+    Args:
+        conn (duckdb.DuckDBPyConnection): Database connection
+        armament (Dict[str, Any]): Armament record to insert
     """
-    Initialize the UAV database.
+    insert_record(conn, 'armaments', armament, ARMAMENT_JSON_FIELDS, 'designation')
+
+
+def insert_uav_armament(conn: duckdb.DuckDBPyConnection, ua: Dict[str, Any]) -> None:
+    """
+    Insert a single UAV-armament relationship record.
+
+    Args:
+        conn (duckdb.DuckDBPyConnection): Database connection
+        ua (Dict[str, Any]): UAV-armament relationship record
+    """
+    insert_record(conn, 'uav_armaments', ua, [], 'uav_designation')
+
+
+def init_database(
+    db_path: Path,
+    schema_path: Path,
+    uavs_path: Path,
+    armaments_path: Path,
+    uav_armaments_path: Path
+) -> None:
+    """
+    Initialize the UAV database with all data.
 
     Args:
         db_path (Path): Path to database file
         schema_path (Path): Path to schema.sql file
-        data_path (Path): Path to initial_uavs.json file
+        uavs_path (Path): Path to initial_uavs.json file
+        armaments_path (Path): Path to armaments.json file
+        uav_armaments_path (Path): Path to uav_armaments.json file
 
     Raises:
         Exception: If database initialization fails
@@ -154,24 +210,41 @@ def init_database(db_path: Path, schema_path: Path, data_path: Path) -> None:
         conn.execute(schema_sql)
         print("✅ Schema created successfully")
 
-        # Load initial data
-        print("📦 Loading initial UAV data...")
-        uavs_data = load_initial_data(data_path)
+        # Load and insert UAVs
+        print("\n📦 Loading UAV data...")
+        uavs_data = load_initial_data(uavs_path)
         print(f"   Found {len(uavs_data)} UAVs to load")
-
-        # Insert each UAV
         print("💾 Inserting UAV records...")
         for i, uav in enumerate(uavs_data, 1):
             designation = uav.get('designation', 'UNKNOWN')
-            print(f"   [{i}/{len(uavs_data)}] Inserting {designation}...")
+            print(f"   [{i}/{len(uavs_data)}] {designation}")
             insert_uav(conn, uav)
-
-        # Verify insertion
         result = conn.execute("SELECT COUNT(*) FROM uavs").fetchone()
-        count = result[0] if result else 0
-        print(f"✅ Successfully loaded {count} UAVs into database")
+        print(f"✅ Loaded {result[0] if result else 0} UAVs")
 
-        # Show summary by country
+        # Load and insert armaments
+        print("\n🔫 Loading armament data...")
+        armaments_data = load_initial_data(armaments_path)
+        print(f"   Found {len(armaments_data)} armaments to load")
+        print("💾 Inserting armament records...")
+        for i, armament in enumerate(armaments_data, 1):
+            designation = armament.get('designation', 'UNKNOWN')
+            print(f"   [{i}/{len(armaments_data)}] {designation}")
+            insert_armament(conn, armament)
+        result = conn.execute("SELECT COUNT(*) FROM armaments").fetchone()
+        print(f"✅ Loaded {result[0] if result else 0} armaments")
+
+        # Load and insert UAV-armament relationships
+        print("\n🔗 Loading UAV-armament relationships...")
+        ua_data = load_initial_data(uav_armaments_path)
+        print(f"   Found {len(ua_data)} relationships to load")
+        print("💾 Inserting relationship records...")
+        for ua in ua_data:
+            insert_uav_armament(conn, ua)
+        result = conn.execute("SELECT COUNT(*) FROM uav_armaments").fetchone()
+        print(f"✅ Loaded {result[0] if result else 0} UAV-armament relationships")
+
+        # Show UAV summary by country
         print("\n📊 UAV Summary by Country:")
         summary = conn.execute("""
             SELECT country_of_origin, COUNT(*) as count
@@ -179,11 +252,10 @@ def init_database(db_path: Path, schema_path: Path, data_path: Path) -> None:
             GROUP BY country_of_origin
             ORDER BY count DESC
         """).fetchall()
-
         for country, count in summary:
             print(f"   {country}: {count}")
 
-        # Show summary by type
+        # Show UAV summary by type
         print("\n📊 UAV Summary by Type:")
         type_summary = conn.execute("""
             SELECT type, COUNT(*) as count
@@ -192,9 +264,19 @@ def init_database(db_path: Path, schema_path: Path, data_path: Path) -> None:
             GROUP BY type
             ORDER BY count DESC
         """).fetchall()
-
         for uav_type, count in type_summary:
             print(f"   {uav_type}: {count}")
+
+        # Show armament summary by type
+        print("\n📊 Armament Summary by Type:")
+        armament_summary = conn.execute("""
+            SELECT weapon_type, COUNT(*) as count
+            FROM armaments
+            GROUP BY weapon_type
+            ORDER BY count DESC
+        """).fetchall()
+        for weapon_type, count in armament_summary:
+            print(f"   {weapon_type}: {count}")
 
     except Exception as e:
         print(f"❌ Error during database initialization: {e}")
@@ -218,10 +300,12 @@ def main() -> int:
         project_root = get_project_root()
         db_path = project_root / "backend" / "data_db" / "uavs.duckdb"
         schema_path = project_root / "backend" / "db" / "schema.sql"
-        data_path = project_root / "backend" / "data" / "initial_uavs.json"
+        uavs_path = project_root / "backend" / "data" / "initial_uavs.json"
+        armaments_path = project_root / "backend" / "data" / "armaments.json"
+        uav_armaments_path = project_root / "backend" / "data" / "uav_armaments.json"
 
         # Initialize database
-        init_database(db_path, schema_path, data_path)
+        init_database(db_path, schema_path, uavs_path, armaments_path, uav_armaments_path)
 
         return 0
 

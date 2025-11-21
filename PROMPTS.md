@@ -152,3 +152,87 @@ Proceed with the frontend now.
 **Status:** Frontend Completed - Full Stack Operational
 
 ---
+
+## 2025-11-20 (Continued)
+
+### Database Expansion - Developmental UAVs, Variants, and Armaments
+
+**Prompt:**
+Search www.twz.com for UAV data. Expand the table schemas for relevant data found there. Particularly focus on new, developmental UAVs in development by all countries. Pay specific attention to the YFQ-42, YFQ-44 and competing Collaborative Combat Aircraft (CCA) designs. Add variants of existing types. For example, there are numerous versions of the MQ-9. Then research all armaments for all aircraft, research the fields that should be listed for armaments, and add a searchable armament database.
+
+**Objectives:**
+1. Research developmental UAVs from twz.com (YFQ-42A, YFQ-44A, CCAs)
+2. Add MQ-9 variants (SkyGuardian, SeaGuardian, Protector, Block 5, Extended Range)
+3. Research and add armaments database
+4. Create UAV-armament relationships
+5. Add API endpoints for armament queries
+
+**Research Completed:**
+- ✅ Researched YFQ-42A (General Atomics CCA) - derived from XQ-67A OBSS program
+- ✅ Researched YFQ-44A "Fury" (Anduril CCA) - first flight 2025
+- ✅ Researched XQ-58 Valkyrie (5 variants) - USAF/USMC loyal wingman
+- ✅ Researched MQ-28 Ghost Bat (Australia) - AI-enabled loyal wingman
+- ✅ Researched MQ-9B family (SkyGuardian, SeaGuardian, Protector, AEW&C)
+- ✅ Researched Gambit modular drone family (6 variants)
+- ✅ Researched Turkish drones (TB3, Kizilelma)
+- ✅ Researched Russian S-70 Okhotnik stealth UCAV
+
+**New UAVs Added (16 new entries):**
+- YFQ-42A (General Atomics CCA)
+- YFQ-44A "Fury" (Anduril CCA)
+- XQ-58 Valkyrie (Kratos)
+- XQ-67A OBSS (General Atomics)
+- MQ-28 Ghost Bat (Boeing Australia)
+- MQ-9B SkyGuardian
+- MQ-9B-SG SeaGuardian
+- Protector RG Mk1 (UK)
+- MQ-9B-AEW (AEW&C variant)
+- Gambit Family (modular concept)
+- Model 437 (Northrop CCA)
+- MQ-9A-ER (Extended Range)
+- MQ-9A-Blk5 (Block 5)
+- TB3 Bayraktar (Naval)
+- Kizilelma (Turkish jet UCAV)
+- S-70 Okhotnik (Russian stealth UCAV)
+
+**Armaments Database Created (15 weapons):**
+- AGM-114 Hellfire (+ variants: K, L, R, R9X)
+- AGM-179 JAGM
+- AIM-9X Sidewinder Block II
+- AIM-120 AMRAAM
+- GBU-12 Paveway II
+- GBU-38 JDAM
+- GBU-39 SDB I
+- GBU-53/B SDB II StormBreaker
+- FIM-92 Stinger
+- MAM-L (Turkish)
+- UMTAS (Turkish)
+- Brimstone (UK)
+- BA-7 Blue Arrow (China)
+- AR-1 (China)
+- Kh-101 (Russia)
+
+**Database Schema Updates:**
+- Added `armaments` table with 50+ fields
+- Added `uav_armaments` relationship table
+- Created indexes and views for efficient queries
+- 25 UAV-armament relationships established
+
+**New API Endpoints:**
+- GET /api/armaments - List all armaments
+- GET /api/armaments/{designation} - Get specific armament
+- GET /api/armaments/search - Search with filters
+- GET /api/uavs/{designation}/armaments - Get UAV's weapons
+- GET /api/armaments/{designation}/uavs - Get weapon's platforms
+- GET /api/filters/weapon-types - Weapon type list
+- GET /api/filters/weapon-classes - Weapon class list
+
+**Database Statistics:**
+- Total UAVs: 32 (from 16 to 32)
+- Total Armaments: 15
+- UAV-Armament Relationships: 25
+- Countries: 8 (added Australia)
+
+**Status:** Completed - Database Expanded with Developmental UAVs and Armaments
+
+---

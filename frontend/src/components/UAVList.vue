@@ -36,6 +36,35 @@
         </div>
 
         <button @click="clearFilters" class="btn-secondary">Clear Filters</button>
+
+        <!-- Column Selector Dropdown -->
+        <div class="column-selector">
+          <button @click="toggleColumnDropdown" class="btn-secondary column-btn">
+            Columns {{ columnDropdownOpen ? '▲' : '▼' }}
+          </button>
+          <div v-if="columnDropdownOpen" class="column-dropdown">
+            <div class="column-dropdown-header">
+              <span>Select Columns</span>
+              <div class="column-actions">
+                <button @click="selectAllColumns" class="btn-small">All</button>
+                <button @click="selectDefaultColumns" class="btn-small">Default</button>
+              </div>
+            </div>
+            <div class="column-dropdown-content">
+              <div v-for="category in columnCategories" :key="category.name" class="column-category">
+                <h4>{{ category.name }}</h4>
+                <label v-for="col in category.columns" :key="col.key" class="column-checkbox">
+                  <input
+                    type="checkbox"
+                    :checked="visibleColumns.includes(col.key)"
+                    @change="toggleColumn(col.key)"
+                  />
+                  {{ col.label }}
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -54,47 +83,32 @@
       <table class="uav-table">
         <thead>
           <tr>
-            <th @click="sort('designation')" class="sortable">
-              Designation {{ getSortIcon('designation') }}
+            <th
+              v-for="col in activeColumns"
+              :key="col.key"
+              @click="col.sortable ? sort(col.key) : null"
+              :class="{ sortable: col.sortable }"
+            >
+              {{ col.label }} {{ col.sortable ? getSortIcon(col.key) : '' }}
             </th>
-            <th @click="sort('name')" class="sortable">
-              Name {{ getSortIcon('name') }}
-            </th>
-            <th @click="sort('country_of_origin')" class="sortable">
-              Country {{ getSortIcon('country_of_origin') }}
-            </th>
-            <th @click="sort('type')" class="sortable">
-              Type {{ getSortIcon('type') }}
-            </th>
-            <th @click="sort('wingspan_meters')" class="sortable">
-              Wingspan (m) {{ getSortIcon('wingspan_meters') }}
-            </th>
-            <th @click="sort('endurance_hours')" class="sortable">
-              Endurance (h) {{ getSortIcon('endurance_hours') }}
-            </th>
-            <th @click="sort('range_km')" class="sortable">
-              Range (km) {{ getSortIcon('range_km') }}
-            </th>
-            <th @click="sort('unit_cost_usd')" class="sortable">
-              Unit Cost (USD) {{ getSortIcon('unit_cost_usd') }}
-            </th>
-            <th>Status</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="uav in paginatedUAVs" :key="uav.id" @click="selectUAV(uav)" class="clickable">
-            <td class="designation">{{ uav.designation }}</td>
-            <td>{{ uav.name || 'N/A' }}</td>
-            <td>{{ uav.country_of_origin || 'N/A' }}</td>
-            <td><span class="badge">{{ uav.type || 'N/A' }}</span></td>
-            <td class="numeric">{{ formatNumber(uav.wingspan_meters) }}</td>
-            <td class="numeric">{{ formatNumber(uav.endurance_hours) }}</td>
-            <td class="numeric">{{ formatNumber(uav.range_km) }}</td>
-            <td class="numeric">{{ formatCurrency(uav.unit_cost_usd) }}</td>
-            <td>
-              <span :class="'status-' + (uav.operational_status || 'unknown').toLowerCase()">
-                {{ uav.operational_status || 'Unknown' }}
+            <td
+              v-for="col in activeColumns"
+              :key="col.key"
+              :class="col.class"
+            >
+              <span v-if="col.key === 'type'" class="badge">{{ uav[col.key] || 'N/A' }}</span>
+              <span v-else-if="col.key === 'operational_status'" :class="'status-' + (uav[col.key] || 'unknown').toLowerCase()">
+                {{ uav[col.key] || 'Unknown' }}
               </span>
+              <span v-else-if="col.format === 'currency'">{{ formatCurrency(uav[col.key]) }}</span>
+              <span v-else-if="col.format === 'number'">{{ formatNumber(uav[col.key]) }}</span>
+              <span v-else-if="col.format === 'array'">{{ formatArray(uav[col.key]) }}</span>
+              <span v-else-if="col.format === 'boolean'">{{ uav[col.key] ? 'Yes' : 'No' }}</span>
+              <span v-else>{{ uav[col.key] || 'N/A' }}</span>
             </td>
           </tr>
         </tbody>
@@ -210,6 +224,88 @@
 import { ref, computed, onMounted } from 'vue'
 import api from '../services/api.js'
 
+// All available columns organized by category
+const allColumnDefinitions = [
+  // Identification
+  { key: 'designation', label: 'Designation', sortable: true, category: 'Identification', class: 'designation' },
+  { key: 'name', label: 'Name', sortable: true, category: 'Identification' },
+  { key: 'manufacturer', label: 'Manufacturer', sortable: true, category: 'Identification' },
+  { key: 'country_of_origin', label: 'Country', sortable: true, category: 'Identification' },
+  { key: 'nato_class', label: 'NATO Class', sortable: true, category: 'Identification' },
+  { key: 'type', label: 'Type', sortable: true, category: 'Identification' },
+  { key: 'operational_status', label: 'Status', sortable: true, category: 'Identification' },
+  { key: 'airframe_type', label: 'Airframe', sortable: true, category: 'Identification' },
+
+  // Physical Dimensions
+  { key: 'wingspan_meters', label: 'Wingspan (m)', sortable: true, category: 'Physical', class: 'numeric', format: 'number' },
+  { key: 'wingspan_feet', label: 'Wingspan (ft)', sortable: true, category: 'Physical', class: 'numeric', format: 'number' },
+  { key: 'length_meters', label: 'Length (m)', sortable: true, category: 'Physical', class: 'numeric', format: 'number' },
+  { key: 'length_feet', label: 'Length (ft)', sortable: true, category: 'Physical', class: 'numeric', format: 'number' },
+  { key: 'height_meters', label: 'Height (m)', sortable: true, category: 'Physical', class: 'numeric', format: 'number' },
+  { key: 'height_feet', label: 'Height (ft)', sortable: true, category: 'Physical', class: 'numeric', format: 'number' },
+
+  // Weight
+  { key: 'empty_weight_kg', label: 'Empty Wt (kg)', sortable: true, category: 'Weight', class: 'numeric', format: 'number' },
+  { key: 'empty_weight_lbs', label: 'Empty Wt (lbs)', sortable: true, category: 'Weight', class: 'numeric', format: 'number' },
+  { key: 'max_takeoff_weight_kg', label: 'MTOW (kg)', sortable: true, category: 'Weight', class: 'numeric', format: 'number' },
+  { key: 'max_takeoff_weight_lbs', label: 'MTOW (lbs)', sortable: true, category: 'Weight', class: 'numeric', format: 'number' },
+  { key: 'payload_capacity_kg', label: 'Payload (kg)', sortable: true, category: 'Weight', class: 'numeric', format: 'number' },
+  { key: 'payload_capacity_lbs', label: 'Payload (lbs)', sortable: true, category: 'Weight', class: 'numeric', format: 'number' },
+  { key: 'fuel_capacity_kg', label: 'Fuel (kg)', sortable: true, category: 'Weight', class: 'numeric', format: 'number' },
+
+  // Propulsion
+  { key: 'engine_type', label: 'Engine Type', sortable: true, category: 'Propulsion' },
+  { key: 'engine_manufacturer', label: 'Engine Mfr', sortable: true, category: 'Propulsion' },
+  { key: 'engine_model', label: 'Engine Model', sortable: true, category: 'Propulsion' },
+  { key: 'thrust_hp', label: 'Thrust (HP)', sortable: true, category: 'Propulsion', class: 'numeric', format: 'number' },
+  { key: 'thrust_lbs', label: 'Thrust (lbs)', sortable: true, category: 'Propulsion', class: 'numeric', format: 'number' },
+  { key: 'number_of_engines', label: 'Engines', sortable: true, category: 'Propulsion', class: 'numeric' },
+
+  // Performance
+  { key: 'cruise_speed_kmh', label: 'Cruise (km/h)', sortable: true, category: 'Performance', class: 'numeric', format: 'number' },
+  { key: 'cruise_speed_mph', label: 'Cruise (mph)', sortable: true, category: 'Performance', class: 'numeric', format: 'number' },
+  { key: 'cruise_speed_knots', label: 'Cruise (kts)', sortable: true, category: 'Performance', class: 'numeric', format: 'number' },
+  { key: 'max_speed_kmh', label: 'Max Speed (km/h)', sortable: true, category: 'Performance', class: 'numeric', format: 'number' },
+  { key: 'max_speed_mach', label: 'Max Speed (Mach)', sortable: true, category: 'Performance', class: 'numeric', format: 'number' },
+  { key: 'service_ceiling_meters', label: 'Ceiling (m)', sortable: true, category: 'Performance', class: 'numeric', format: 'number' },
+  { key: 'service_ceiling_feet', label: 'Ceiling (ft)', sortable: true, category: 'Performance', class: 'numeric', format: 'number' },
+  { key: 'range_km', label: 'Range (km)', sortable: true, category: 'Performance', class: 'numeric', format: 'number' },
+  { key: 'range_miles', label: 'Range (mi)', sortable: true, category: 'Performance', class: 'numeric', format: 'number' },
+  { key: 'range_nm', label: 'Range (nm)', sortable: true, category: 'Performance', class: 'numeric', format: 'number' },
+  { key: 'endurance_hours', label: 'Endurance (h)', sortable: true, category: 'Performance', class: 'numeric', format: 'number' },
+  { key: 'combat_radius_km', label: 'Combat Radius (km)', sortable: true, category: 'Performance', class: 'numeric', format: 'number' },
+
+  // Mission & Armament
+  { key: 'primary_function', label: 'Primary Function', sortable: false, category: 'Mission' },
+  { key: 'mission_types', label: 'Mission Types', sortable: false, category: 'Mission', format: 'array' },
+  { key: 'armament', label: 'Armament', sortable: false, category: 'Mission', format: 'array' },
+  { key: 'hardpoints', label: 'Hardpoints', sortable: true, category: 'Mission', class: 'numeric' },
+  { key: 'internal_weapons_bays', label: 'Internal Bay', sortable: true, category: 'Mission', format: 'boolean' },
+  { key: 'max_weapons_load_kg', label: 'Weapons Load (kg)', sortable: true, category: 'Mission', class: 'numeric', format: 'number' },
+
+  // Sensors & Stealth
+  { key: 'sensor_suite', label: 'Sensors', sortable: false, category: 'Systems', format: 'array' },
+  { key: 'radar_type', label: 'Radar', sortable: true, category: 'Systems' },
+  { key: 'stealth_features', label: 'Stealth Features', sortable: false, category: 'Systems' },
+  { key: 'autonomy_level', label: 'Autonomy', sortable: true, category: 'Systems' },
+  { key: 'datalink_type', label: 'Datalink', sortable: true, category: 'Systems' },
+
+  // Operational
+  { key: 'operators', label: 'Operators', sortable: false, category: 'Operational', format: 'array' },
+  { key: 'crew_size_remote', label: 'Crew Size', sortable: true, category: 'Operational', class: 'numeric' },
+  { key: 'launch_method', label: 'Launch Method', sortable: true, category: 'Operational' },
+  { key: 'recovery_method', label: 'Recovery Method', sortable: true, category: 'Operational' },
+  { key: 'total_units_produced', label: 'Units Produced', sortable: true, category: 'Operational', class: 'numeric', format: 'number' },
+
+  // Economics
+  { key: 'unit_cost_usd', label: 'Unit Cost', sortable: true, category: 'Economics', class: 'numeric', format: 'currency' },
+  { key: 'program_cost_usd', label: 'Program Cost', sortable: true, category: 'Economics', class: 'numeric', format: 'currency' },
+  { key: 'fiscal_year', label: 'Fiscal Year', sortable: true, category: 'Economics', class: 'numeric' },
+]
+
+// Default visible columns
+const defaultColumns = ['designation', 'name', 'country_of_origin', 'type', 'wingspan_meters', 'endurance_hours', 'range_km', 'unit_cost_usd', 'operational_status']
+
 export default {
   name: 'UAVList',
   setup() {
@@ -219,6 +315,10 @@ export default {
     const loading = ref(true)
     const error = ref(null)
     const selectedUAV = ref(null)
+
+    // Column selector
+    const columnDropdownOpen = ref(false)
+    const visibleColumns = ref([...defaultColumns])
 
     // Filters
     const filters = ref({
@@ -235,6 +335,23 @@ export default {
     // Pagination
     const currentPage = ref(1)
     const itemsPerPage = ref(20)
+
+    // Column categories for dropdown
+    const columnCategories = computed(() => {
+      const categories = {}
+      allColumnDefinitions.forEach(col => {
+        if (!categories[col.category]) {
+          categories[col.category] = { name: col.category, columns: [] }
+        }
+        categories[col.category].columns.push(col)
+      })
+      return Object.values(categories)
+    })
+
+    // Active columns based on selection
+    const activeColumns = computed(() => {
+      return allColumnDefinitions.filter(col => visibleColumns.value.includes(col.key))
+    })
 
     const totalUAVs = computed(() => uavs.value.length)
 
@@ -389,6 +506,33 @@ export default {
       }).format(value)
     }
 
+    const formatArray = (value) => {
+      if (!value || !Array.isArray(value)) return 'N/A'
+      return value.slice(0, 3).join(', ') + (value.length > 3 ? '...' : '')
+    }
+
+    // Column selector functions
+    const toggleColumnDropdown = () => {
+      columnDropdownOpen.value = !columnDropdownOpen.value
+    }
+
+    const toggleColumn = (key) => {
+      const index = visibleColumns.value.indexOf(key)
+      if (index === -1) {
+        visibleColumns.value.push(key)
+      } else {
+        visibleColumns.value.splice(index, 1)
+      }
+    }
+
+    const selectAllColumns = () => {
+      visibleColumns.value = allColumnDefinitions.map(col => col.key)
+    }
+
+    const selectDefaultColumns = () => {
+      visibleColumns.value = [...defaultColumns]
+    }
+
     onMounted(() => {
       loadUAVs()
       loadFilters()
@@ -411,6 +555,10 @@ export default {
       filteredUAVs,
       totalPages,
       paginatedUAVs,
+      columnDropdownOpen,
+      visibleColumns,
+      columnCategories,
+      activeColumns,
       loadUAVs,
       applyFilters,
       clearFilters,
@@ -422,7 +570,12 @@ export default {
       previousPage,
       nextPage,
       formatNumber,
-      formatCurrency
+      formatCurrency,
+      formatArray,
+      toggleColumnDropdown,
+      toggleColumn,
+      selectAllColumns,
+      selectDefaultColumns
     }
   }
 }

@@ -253,25 +253,167 @@ class Database:
         Returns:
             Dict[str, Any]: Row as dictionary with JSON fields parsed
         """
+        json_fields = [
+            'mission_types', 'armament', 'sensor_suite', 'operators',
+            'export_countries', 'notable_features', 'imagery_urls',
+            'model_urls', 'variants', 'launch_platform_types'
+        ]
         result = {}
         for i, col in enumerate(columns):
             value = row[i]
-
-            # Parse JSON fields
-            if value is not None and col in [
-                'mission_types', 'armament', 'sensor_suite', 'operators',
-                'export_countries', 'notable_features', 'imagery_urls',
-                'model_urls', 'variants'
-            ]:
+            if value is not None and col in json_fields:
                 try:
                     value = json.loads(value)
                 except (json.JSONDecodeError, TypeError):
-                    # Keep as string if parsing fails
                     pass
-
             result[col] = value
-
         return result
+
+    # =====================================================
+    # ARMAMENT METHODS
+    # =====================================================
+
+    def get_all_armaments(self) -> List[Dict[str, Any]]:
+        """
+        Retrieve all armaments from database.
+
+        Returns:
+            List[Dict[str, Any]]: List of armament records
+        """
+        with self.get_connection() as conn:
+            result = conn.execute(
+                "SELECT * FROM armaments ORDER BY weapon_type, designation"
+            ).fetchall()
+            columns = [desc[0] for desc in conn.description]
+            return [self._row_to_dict(row, columns) for row in result]
+
+    def get_armament_by_designation(self, designation: str) -> Optional[Dict[str, Any]]:
+        """
+        Get specific armament by designation.
+
+        Args:
+            designation (str): Armament designation (e.g., "AGM-114")
+
+        Returns:
+            Optional[Dict[str, Any]]: Armament record or None
+        """
+        with self.get_connection() as conn:
+            result = conn.execute(
+                "SELECT * FROM armaments WHERE designation = ?",
+                [designation]
+            ).fetchone()
+            if result is None:
+                return None
+            columns = [desc[0] for desc in conn.description]
+            return self._row_to_dict(result, columns)
+
+    def search_armaments(
+        self,
+        weapon_type: Optional[str] = None,
+        weapon_class: Optional[str] = None,
+        country: Optional[str] = None,
+        guidance_type: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Search armaments with filters.
+
+        Args:
+            weapon_type: Filter by type (Missile, Bomb, etc.)
+            weapon_class: Filter by class (Air-to-Ground, etc.)
+            country: Filter by country of origin
+            guidance_type: Filter by guidance type
+
+        Returns:
+            List[Dict[str, Any]]: Matching armaments
+        """
+        query = "SELECT * FROM armaments WHERE 1=1"
+        params = []
+
+        if weapon_type:
+            query += " AND weapon_type = ?"
+            params.append(weapon_type)
+        if weapon_class:
+            query += " AND weapon_class LIKE ?"
+            params.append(f"%{weapon_class}%")
+        if country:
+            query += " AND country_of_origin = ?"
+            params.append(country)
+        if guidance_type:
+            query += " AND guidance_type LIKE ?"
+            params.append(f"%{guidance_type}%")
+
+        query += " ORDER BY designation"
+
+        with self.get_connection() as conn:
+            result = conn.execute(query, params).fetchall()
+            columns = [desc[0] for desc in conn.description]
+            return [self._row_to_dict(row, columns) for row in result]
+
+    def get_armaments_for_uav(self, uav_designation: str) -> List[Dict[str, Any]]:
+        """
+        Get all armaments compatible with a specific UAV.
+
+        Args:
+            uav_designation (str): UAV designation
+
+        Returns:
+            List[Dict[str, Any]]: List of armaments with integration details
+        """
+        with self.get_connection() as conn:
+            result = conn.execute(
+                """
+                SELECT a.*, ua.max_quantity, ua.hardpoint_positions,
+                       ua.integration_status, ua.notes as integration_notes
+                FROM armaments a
+                JOIN uav_armaments ua ON a.designation = ua.armament_designation
+                WHERE ua.uav_designation = ?
+                ORDER BY a.weapon_type, a.designation
+                """,
+                [uav_designation]
+            ).fetchall()
+            columns = [desc[0] for desc in conn.description]
+            return [self._row_to_dict(row, columns) for row in result]
+
+    def get_uavs_for_armament(self, armament_designation: str) -> List[Dict[str, Any]]:
+        """
+        Get all UAVs that can carry a specific armament.
+
+        Args:
+            armament_designation (str): Armament designation
+
+        Returns:
+            List[Dict[str, Any]]: List of UAVs with integration details
+        """
+        with self.get_connection() as conn:
+            result = conn.execute(
+                """
+                SELECT u.designation, u.name, u.type, u.country_of_origin,
+                       ua.max_quantity, ua.hardpoint_positions, ua.integration_status
+                FROM uavs u
+                JOIN uav_armaments ua ON u.designation = ua.uav_designation
+                WHERE ua.armament_designation = ?
+                ORDER BY u.designation
+                """,
+                [armament_designation]
+            ).fetchall()
+            columns = [desc[0] for desc in conn.description]
+            return [self._row_to_dict(row, columns) for row in result]
+
+    def get_weapon_types(self) -> List[str]:
+        """Get list of all weapon types."""
+        with self.get_connection() as conn:
+            result = conn.execute(
+                "SELECT DISTINCT weapon_type FROM armaments ORDER BY weapon_type"
+            ).fetchall()
+            return [row[0] for row in result]
+
+    def get_weapon_classes(self) -> List[str]:
+        """Get list of all weapon classes."""
+        with self.get_connection() as conn:
+            result = conn.execute(
+                "SELECT DISTINCT weapon_class FROM armaments WHERE weapon_class IS NOT NULL ORDER BY weapon_class"
+            ).fetchall()
+            return [row[0] for row in result]
 
 
 # Global database instance

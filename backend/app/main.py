@@ -219,6 +219,161 @@ async def get_types():
         raise HTTPException(status_code=500, detail=f"Error fetching types: {str(e)}")
 
 
+# =====================================================
+# ARMAMENT ENDPOINTS
+# =====================================================
+
+@app.get(f"{settings.API_V1_PREFIX}/armaments", tags=["Armaments"])
+async def list_armaments():
+    """
+    List all armaments.
+
+    Returns:
+        dict: List of all armament records
+    """
+    try:
+        armaments = db.get_all_armaments()
+        return {"total": len(armaments), "armaments": armaments}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching armaments: {str(e)}")
+
+
+@app.get(
+    f"{settings.API_V1_PREFIX}/armaments/{{designation}}",
+    tags=["Armaments"]
+)
+async def get_armament(
+    designation: str = FastAPIPath(..., description="Armament designation (e.g., AGM-114)")
+):
+    """
+    Get specific armament by designation.
+
+    Args:
+        designation: Armament designation code
+
+    Returns:
+        dict: Armament record
+
+    Raises:
+        HTTPException: 404 if armament not found
+    """
+    try:
+        armament = db.get_armament_by_designation(designation)
+        if armament is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Armament with designation '{designation}' not found"
+            )
+        return armament
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching armament: {str(e)}")
+
+
+@app.get(f"{settings.API_V1_PREFIX}/armaments/search", tags=["Armaments"])
+async def search_armaments(
+    weapon_type: str = None,
+    weapon_class: str = None,
+    country: str = None,
+    guidance_type: str = None
+):
+    """
+    Search armaments with filters.
+
+    Args:
+        weapon_type: Filter by type (Missile, Bomb, etc.)
+        weapon_class: Filter by class (Air-to-Ground, etc.)
+        country: Filter by country of origin
+        guidance_type: Filter by guidance type
+
+    Returns:
+        dict: Filtered list of armaments
+    """
+    try:
+        armaments = db.search_armaments(
+            weapon_type=weapon_type,
+            weapon_class=weapon_class,
+            country=country,
+            guidance_type=guidance_type
+        )
+        return {"total": len(armaments), "armaments": armaments}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error searching armaments: {str(e)}")
+
+
+@app.get(
+    f"{settings.API_V1_PREFIX}/uavs/{{designation}}/armaments",
+    tags=["UAV Armaments"]
+)
+async def get_uav_armaments(
+    designation: str = FastAPIPath(..., description="UAV designation (e.g., MQ-9)")
+):
+    """
+    Get all armaments compatible with a specific UAV.
+
+    Args:
+        designation: UAV designation code
+
+    Returns:
+        dict: List of armaments with integration details
+    """
+    try:
+        armaments = db.get_armaments_for_uav(designation)
+        return {"uav_designation": designation, "total": len(armaments), "armaments": armaments}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching UAV armaments: {str(e)}")
+
+
+@app.get(
+    f"{settings.API_V1_PREFIX}/armaments/{{designation}}/uavs",
+    tags=["UAV Armaments"]
+)
+async def get_armament_uavs(
+    designation: str = FastAPIPath(..., description="Armament designation (e.g., AGM-114)")
+):
+    """
+    Get all UAVs that can carry a specific armament.
+
+    Args:
+        designation: Armament designation code
+
+    Returns:
+        dict: List of UAVs with integration details
+    """
+    try:
+        uavs = db.get_uavs_for_armament(designation)
+        return {"armament_designation": designation, "total": len(uavs), "uavs": uavs}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching armament UAVs: {str(e)}")
+
+
+@app.get(
+    f"{settings.API_V1_PREFIX}/filters/weapon-types",
+    response_model=List[str],
+    tags=["Filters"]
+)
+async def get_weapon_types():
+    """Get list of all weapon types."""
+    try:
+        return db.get_weapon_types()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching weapon types: {str(e)}")
+
+
+@app.get(
+    f"{settings.API_V1_PREFIX}/filters/weapon-classes",
+    response_model=List[str],
+    tags=["Filters"]
+)
+async def get_weapon_classes():
+    """Get list of all weapon classes."""
+    try:
+        return db.get_weapon_classes()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching weapon classes: {str(e)}")
+
+
 # Error handlers
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
